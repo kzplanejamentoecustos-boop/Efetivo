@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Efetivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#00144D;
+    --primary-light:#12306e;
+    --ativo:#0CA30C;
+    --demitido:#D03B3B;
+    --atencao:#FAB219;
+    --indireta:#6c5ce7;
+    --bg:#f4f6f9;
+    --card:#ffffff;
+    --border:#e2e6ec;
+    --text:#1a1a2e;
+    --text-muted:#6c7686;
+    --shadow:0 2px 12px rgba(0,0,0,0.06);
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; font-size:14px;}
+  header{
+    background:var(--primary); color:#fff; padding:18px 32px;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;
+  }
+  .header-left{display:flex; align-items:center; gap:16px;}
+  #logo-area{display:flex; align-items:center; justify-content:center; width:52px; height:52px; background:#fff; border-radius:8px; overflow:hidden; flex-shrink:0;}
+  #logo-area img{max-width:100%; max-height:100%; object-fit:contain;}
+  .logo-upload-btn{font-size:10px; color:var(--primary); cursor:pointer; text-align:center; line-height:1.2; padding:4px;}
+  header h1{font-size:19px; margin:0; font-weight:700;}
+  header .subtitle{font-size:12px; opacity:.75; margin-top:2px;}
+  .header-right{text-align:right; font-size:11.5px; opacity:.9; line-height:1.6;}
+
+  .revision-bar{
+    background:#eef1f8; border-bottom:1px solid var(--border);
+    padding:10px 32px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:12.5px;
+  }
+  .revision-bar .rev-label{font-weight:700; color:var(--primary);}
+  .revision-bar .rev-meta{color:var(--text-muted);}
+  .dot{width:6px; height:6px; border-radius:50%; background:var(--ativo); display:inline-block; margin-right:4px;}
+  .dot.unsaved{background:var(--atencao);}
+
+  main{max-width:1440px; margin:0 auto; padding:22px 32px 60px;}
+
+  .toolbar{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:14px 18px; display:flex; flex-wrap:wrap; gap:12px; align-items:center;
+    margin-bottom:16px; box-shadow:var(--shadow);
+  }
+  .toolbar .group{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .btn{
+    border:none; border-radius:8px; padding:9px 15px; font-size:12.5px; font-weight:600;
+    cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:.15s; white-space:nowrap;
+  }
+  .btn-primary{background:var(--primary); color:#fff;}
+  .btn-primary:hover{background:var(--primary-light);}
+  .btn-outline{background:#fff; border:1px solid var(--border); color:var(--text);}
+  .btn-outline:hover{background:#f0f2f6;}
+  .btn-danger{background:#fdecec; color:var(--demitido);}
+  .btn-danger:hover{background:#fbdcdc;}
+  .btn-ghost{background:#eef1f8; color:var(--primary);}
+  .btn-ghost:hover{background:#e2e7f5;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+  input[type=file]{display:none;}
+  select, input[type=text], input[type=date], input[type=number]{
+    border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; background:#fff; color:var(--text);
+  }
+  .switch-label{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-muted); cursor:pointer;}
+
+  .status-banner{
+    display:none; align-items:center; gap:8px; background:#fff7e6; border:1px solid var(--atencao);
+    color:#8a6100; padding:10px 16px; border-radius:8px; margin-bottom:16px; font-size:13px;
+  }
+  .status-banner.show{display:flex;}
+
+  .kpi-row{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-bottom:18px;}
+  .kpi-card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow);}
+  .kpi-label{font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; font-weight:600;}
+  .kpi-value{font-size:23px; font-weight:800; color:var(--primary); margin-top:5px;}
+  .kpi-value.ativo{color:var(--ativo);} .kpi-value.demitido{color:var(--demitido);} .kpi-value.indireta{color:var(--indireta);}
+
+  .panel{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); margin-bottom:18px;}
+  .panel h2{font-size:15px; margin:0 0 14px; color:var(--primary);}
+  #chart-empty{text-align:center; color:var(--text-muted); font-size:13px; padding:40px 0;}
+
+  table{width:100%; border-collapse:collapse; font-size:12.8px;}
+  thead th{
+    text-align:left; padding:10px 12px; background:#f7f8fb; color:var(--text-muted);
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; border-bottom:1px solid var(--border); position:sticky; top:0;
+  }
+  tbody td{padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:middle;}
+  tbody tr:hover{background:#fafbfd;}
+  .table-wrap{max-height:560px; overflow:auto; border:1px solid var(--border); border-radius:8px;}
+  .badge{display:inline-block; padding:3px 10px; border-radius:999px; font-size:10.5px; font-weight:700;}
+  .badge-ativo{background:#e7f8e7; color:var(--ativo);}
+  .badge-demitido{background:#fdecec; color:var(--demitido);}
+  .badge-origem{background:#eef1f8; color:var(--primary); font-weight:600;}
+  .badge-direta{background:#eef1f8; color:var(--primary);}
+  .badge-indireta{background:#f1eefc; color:var(--indireta);}
+  .badge-naoclass{background:#fdf3e3; color:#8a6100;}
+  .row-actions{display:flex; gap:6px;}
+  .icon-btn{border:none; background:none; cursor:pointer; font-size:14px; padding:4px 6px; border-radius:6px; color:var(--text-muted);}
+  .icon-btn:hover{background:#eef1f8; color:var(--primary);}
+  .empty-state{text-align:center; padding:40px; color:var(--text-muted); font-size:13px;}
+
+  .modal-overlay{display:none; position:fixed; inset:0; background:rgba(10,15,35,.45); z-index:100; align-items:center; justify-content:center; padding:20px;}
+  .modal-overlay.show{display:flex;}
+  .modal{background:#fff; border-radius:var(--radius); padding:24px; width:100%; max-width:480px; max-height:88vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .modal.wide{max-width:640px;}
+  .modal h3{margin:0 0 4px; color:var(--primary); font-size:17px;}
+  .modal .modal-sub{font-size:12.5px; color:var(--text-muted); margin-bottom:16px;}
+  .field{margin-bottom:14px; display:flex; flex-direction:column; gap:5px;}
+  .field label{font-size:12px; font-weight:600; color:var(--text-muted);}
+  .field input, .field select{width:100%;}
+  .field-row{display:flex; gap:10px;}
+  .field-row .field{flex:1;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:18px;}
+  .import-summary{font-size:13px; line-height:1.6;}
+  .import-summary b{color:var(--primary);}
+  .diff-section{margin-bottom:14px;}
+  .diff-section h4{font-size:12.5px; margin:0 0 6px; text-transform:uppercase; letter-spacing:.03em;}
+  .diff-list{list-style:none; margin:0; padding:0; max-height:160px; overflow:auto; border:1px solid var(--border); border-radius:8px;}
+  .diff-list li{padding:7px 10px; border-bottom:1px solid var(--border); font-size:12.5px; display:flex; justify-content:space-between; gap:8px; align-items:center;}
+  .diff-list li:last-child{border-bottom:none;}
+  .diff-list .muted{color:var(--text-muted); font-size:11.5px;}
+  .tag-novo{color:var(--ativo); font-weight:700;}
+  .tag-alt{color:#b8860b; font-weight:700;}
+  .tag-dem{color:var(--demitido); font-weight:700;}
+  .tag-sumiu{color:#b8860b; font-weight:700;}
+  .mini-btn{border:none; background:var(--primary); color:#fff; border-radius:6px; padding:4px 8px; font-size:11px; cursor:pointer;}
+
+  .rev-item{display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px;}
+  .rev-item .rev-item-label{font-weight:700; color:var(--primary); font-size:13.5px;}
+  .rev-item .rev-item-meta{font-size:11.5px; color:var(--text-muted); margin-top:2px;}
+
+  .class-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--border);}
+  .class-row:last-child{border-bottom:none;}
+  .class-row .fn-name{font-size:12.8px;}
+  .class-row .fn-count{font-size:11px; color:var(--text-muted);}
+
+  footer{text-align:center; padding:18px; font-size:11.5px; color:var(--text-muted); border-top:1px solid var(--border); margin-top:20px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div id="logo-area">
+      <img id="company-logo" src="" alt="Logo" style="display:none;">
+      <label id="logo-placeholder" class="logo-upload-btn">📷 Logo<input type="file" id="logo-input" accept="image/*"></label>
+    </div>
+    <div>
+      <h1>Controle de Efetivo</h1>
+      <div class="subtitle">Admissões, demissões e classificação — Consórcio + empresas consorciadas</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div id="conn-status">🔄 Conectando…</div>
+  </div>
+</header>
+
+<div class="revision-bar">
+  <span><span class="dot" id="rev-dot"></span><span class="rev-label" id="rev-label">Nenhuma revisão carregada</span></span>
+  <span class="rev-meta" id="rev-meta"></span>
+</div>
+
+<main>
+
+  <div class="status-banner" id="status-banner">
+    ⚠️ Nenhuma revisão carregada ainda. Clique em <b>"Carregar Revisão"</b> para trazer o mês anterior, ou comece uma nova importando o Excel direto.
+  </div>
+
+  <div class="toolbar">
+    <div class="group">
+      <button class="btn btn-outline" id="btn-open-revisions">📂 Carregar Revisão</button>
+      <button class="btn btn-primary" id="btn-save-new-revision">🆕 Salvar Nova Revisão</button>
+      <button class="btn btn-ghost" id="btn-update-revision" disabled title="Carregue ou salve uma revisão primeiro">💾 Salvar Atualização</button>
+    </div>
+    <div class="group" style="margin-left:auto;">
+      <label class="btn btn-outline">
+        📥 Importar Excel
+        <input type="file" id="excel-input" accept=".xls,.xlsx">
+      </label>
+      <button class="btn btn-outline" id="btn-add-person">➕ Adicionar Pessoa</button>
+      <button class="btn btn-outline" id="btn-classify">🏷️ Classificar Tipo M.O.</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="group">
+      <label class="field" style="margin:0;"><label style="font-size:11px;color:var(--text-muted);">Status</label>
+        <select id="filter-status">
+          <option value="todos">Todos</option>
+          <option value="ativo">Somente Ativos</option>
+          <option value="demitido">Somente Demitidos</option>
+        </select>
+      </label>
+    </div>
+    <div class="group">
+      <label class="field" style="margin:0;"><label style="font-size:11px;color:var(--text-muted);">Empresa</label>
+        <select id="filter-empresa"><option value="todas">Todas</option></select>
+      </label>
+    </div>
+    <div class="group">
+      <label class="field" style="margin:0;"><label style="font-size:11px;color:var(--text-muted);">Tipo M.O.</label>
+        <select id="filter-tipo">
+          <option value="todos">Todos</option>
+          <option value="Direta">Direta</option>
+          <option value="Indireta">Indireta</option>
+          <option value="">Não classificado</option>
+        </select>
+      </label>
+    </div>
+    <div class="group" style="flex:1; min-width:200px;">
+      <input type="text" id="filter-busca" placeholder="🔎 Buscar por nome ou função…" style="width:100%;">
+    </div>
+    <label class="switch-label"><input type="checkbox" id="toggle-salario"> Mostrar salários</label>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">Ativo Total</div><div class="kpi-value ativo" id="kpi-ativo-total">–</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ativos — Consórcio</div><div class="kpi-value" id="kpi-ativo-consorcio">–</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ativos — Consorciadas</div><div class="kpi-value" id="kpi-ativo-consorciadas">–</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ativos — M.O. Direta</div><div class="kpi-value" id="kpi-ativo-direta">–</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ativos — M.O. Indireta</div><div class="kpi-value indireta" id="kpi-ativo-indireta">–</div></div>
+    <div class="kpi-card"><div class="kpi-label">Admitidos (30 dias)</div><div class="kpi-value ativo" id="kpi-admitidos-30">–</div></div>
+    <div class="kpi-card"><div class="kpi-label">Demitidos (30 dias)</div><div class="kpi-value demitido" id="kpi-demitidos-30">–</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total de Registros</div><div class="kpi-value" id="kpi-total-registros">–</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Evolução do Efetivo Ativo</h2>
+    <div id="chart-filter-note" style="font-size:11.5px; color:var(--text-muted); margin:-8px 0 12px;"></div>
+    <div id="chart-empty">Sem dados carregados — importe um Excel ou carregue uma revisão.</div>
+    <canvas id="chart-evolucao" height="90" style="display:none;"></canvas>
+  </div>
+
+  <div class="panel">
+    <h2>Registros</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th><th>Função</th><th>Empresa</th><th>Tipo M.O.</th>
+            <th id="th-salario">Salário</th><th>Admissão</th><th>Demissão</th>
+            <th>Status</th><th>Origem</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div class="empty-state" id="table-empty" style="display:none;">Nenhum registro encontrado.</div>
+    </div>
+  </div>
+
+</main>
+
+<footer>Controle de Efetivo · CTC Infra · v2.0 · Revisões salvas na coleção <b>"Controle de Efetivo"</b> (Firebase)</footer>
+
+<!-- ===== Modal: Adicionar/Editar Pessoa ===== -->
+<div class="modal-overlay" id="modal-person">
+  <div class="modal">
+    <h3 id="modal-person-title">Adicionar Pessoa</h3>
+    <div class="modal-sub">Use para pessoas das empresas consorciadas (fora do Excel) ou para editar um registro existente.</div>
+    <div class="field"><label>Nome completo *</label><input type="text" id="f-nome" placeholder="Ex: João da Silva"></div>
+    <div class="field-row">
+      <div class="field"><label>Função</label><input type="text" id="f-funcao" placeholder="Ex: Encarregado de Obras"></div>
+      <div class="field"><label>Matrícula / Chapa (opcional)</label><input type="text" id="f-chapa" placeholder="Se houver"></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Empresa *</label>
+        <input type="text" id="f-empresa" placeholder="Ex: Consórcio, ou nome da consorciada" list="lista-empresas">
+        <datalist id="lista-empresas"></datalist>
+      </div>
+      <div class="field">
+        <label>Tipo de M.O.</label>
+        <select id="f-tipo">
+          <option value="">Não classificado</option>
+          <option value="Direta">Direta</option>
+          <option value="Indireta">Indireta</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Data de Admissão *</label><input type="date" id="f-admissao"></div>
+      <div class="field"><label>Data de Demissão (se houver)</label><input type="date" id="f-demissao"></div>
+    </div>
+    <div class="field"><label>Salário Mensal (opcional)</label><input type="number" id="f-salario" step="0.01" placeholder="0,00"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btn-remove-demissao" style="display:none; margin-right:auto;">Remover data de demissão</button>
+      <button class="btn btn-outline" id="btn-cancel-person">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-person">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: Resumo da Importação (diff) ===== -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal wide">
+    <h3>Mudanças identificadas na importação</h3>
+    <div class="modal-sub" id="import-sub">Comparação entre a revisão carregada e a nova planilha.</div>
+    <div class="import-summary" id="import-summary-content"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="btn-close-import">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: Lista de Revisões ===== -->
+<div class="modal-overlay" id="modal-revisions">
+  <div class="modal wide">
+    <h3>Carregar Revisão</h3>
+    <div class="modal-sub">Selecione uma revisão salva na nuvem para carregar.</div>
+    <div id="legacy-warning" style="display:none; background:#fdecec; border:1px solid var(--demitido); color:#8a1f1f; padding:10px 14px; border-radius:8px; font-size:12.5px; margin-bottom:14px;">
+      ⚠️ Encontrados <b id="legacy-count">0</b> documento(s) antigos (de uma versão anterior do app, um por pessoa) misturados nesta coleção. Eles não são revisões válidas e não aparecem na lista abaixo.
+      <div style="margin-top:8px;"><button class="btn btn-danger" id="btn-clean-legacy">🧹 Excluir documentos antigos</button></div>
+    </div>
+    <div id="revisions-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-revisions">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: Nome da Nova Revisão ===== -->
+<div class="modal-overlay" id="modal-new-revision">
+  <div class="modal">
+    <h3>Salvar Nova Revisão</h3>
+    <div class="modal-sub">Uma nova revisão cria um registro independente (ex: início de um novo mês), preservando a revisão anterior intacta.</div>
+    <div class="field"><label>Nome da revisão *</label><input type="text" id="f-rev-label" placeholder="Ex: Setembro/2026"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-new-revision">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirm-new-revision">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: Classificar Tipo de M.O. ===== -->
+<div class="modal-overlay" id="modal-classify">
+  <div class="modal wide">
+    <h3>Classificar Tipo de M.O. por Função</h3>
+    <div class="modal-sub">Classifique cada função uma vez — aplica automaticamente a todas as pessoas com essa função (inclusive em futuras importações).</div>
+    <div id="classify-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-classify">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-classify">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: Confirmar Exclusão ===== -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:380px;">
+    <h3>Confirmar exclusão</h3>
+    <div class="modal-sub" id="confirm-text">Tem certeza que deseja excluir este registro?</div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-confirm">Cancelar</button>
+      <button class="btn btn-danger" id="btn-confirm-yes">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+  getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCk1hdv3h8A2gDOcaZDRuRtceDiG2bvXOc",
+  authDomain: "kz-planejamento-e-custos.firebaseapp.com",
+  projectId: "kz-planejamento-e-custos",
+  storageBucket: "kz-planejamento-e-custos.firebasestorage.app",
+  messagingSenderId: "755715307647",
+  appId: "1:755715307647:web:6573d0437b23b880bae74a",
+  measurementId: "G-YD64M53C0S"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const COLLECTION_NAME = "Controle de Efetivo";
+
+let AUTH_READY = false;
+const $ = (id) => document.getElementById(id);
+
+// ============ ESTADO ============
+// STATE.people : { [docId]: {nome, funcao, empresa, chapa, salario, dataAdmissao, dataDemissao, origem, tipoMO} }
+// STATE.funcaoTipoMap : { [FUNCAO_UPPER]: 'Direta' | 'Indireta' }
+let STATE = { people: {}, funcaoTipoMap: {} };
+let currentRevisionId = null;
+let currentRevisionLabel = null;
+let currentRevisionUpdatedAt = null;
+
+// ============ LOGO ============
+const logoInput = $('logo-input'), logoImg = $('company-logo'), logoPlaceholder = $('logo-placeholder');
+const savedLogo = localStorage.getItem('company_logo_efetivo');
+if (savedLogo) { logoImg.src = savedLogo; logoImg.style.display = 'block'; logoPlaceholder.style.display = 'none'; }
+logoInput.addEventListener('change', (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    logoImg.src = ev.target.result; logoImg.style.display = 'block'; logoPlaceholder.style.display = 'none';
+    localStorage.setItem('company_logo_efetivo', ev.target.result);
+  };
+  reader.readAsDataURL(file);
+});
+
+// ============ AUTENTICAÇÃO ============
+onAuthStateChanged(auth, (user) => { if (user) { AUTH_READY = true; $('conn-status').textContent = '🟢 Conectado'; } });
+signInAnonymously(auth).catch((err) => { $('conn-status').textContent = '🔴 Erro de conexão (' + err.code + ')'; });
+
+// ============ HELPERS DE DATA ============
+function excelSerialToISO(serial){
+  const utcDays = Math.floor(serial - 25569);
+  return new Date(utcDays * 86400 * 1000).toISOString().slice(0,10);
+}
+function parseDateCell(value){
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'number') return excelSerialToISO(value);
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (!s) return '';
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return '';
+  }
+  if (value instanceof Date) return value.toISOString().slice(0,10);
+  return '';
+}
+function fmtDateBR(iso){ if (!iso) return '—'; const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; }
+function fmtDateTimeBR(iso){ if (!iso) return ''; const d = new Date(iso); return d.toLocaleString('pt-BR'); }
+function fmtMoney(v){ if (v === undefined || v === null || v === '') return '—'; return Number(v).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}); }
+function isAtivo(p){ return !p.dataDemissao; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function tipoFromMap(funcao){
+  const key = (funcao || '').trim().toUpperCase();
+  return STATE.funcaoTipoMap[key] || '';
+}
+function parseTipoMOCell(value){
+  const s = String(value || '').trim().toUpperCase();
+  if (!s) return '';
+  if (s.includes('INDIRETA')) return 'Indireta';
+  if (s.includes('DIRETA')) return 'Direta';
+  return '';
+}
+
+// ============ REVISÕES ============
+function markUnsaved(){ $('rev-dot').classList.add('unsaved'); }
+function markSaved(){ $('rev-dot').classList.remove('unsaved'); }
+
+function refreshRevisionBar(){
+  if (currentRevisionId) {
+    $('rev-label').textContent = `Revisão: ${currentRevisionLabel}`;
+    $('rev-meta').textContent = currentRevisionUpdatedAt ? `Última atualização: ${fmtDateTimeBR(currentRevisionUpdatedAt)}` : '';
+    $('btn-update-revision').disabled = false;
+    $('btn-update-revision').title = '';
+  } else {
+    $('rev-label').textContent = 'Nenhuma revisão carregada';
+    $('rev-meta').textContent = '';
+    $('btn-update-revision').disabled = true;
+    $('btn-update-revision').title = 'Carregue ou salve uma revisão primeiro';
+  }
+}
+
+$('btn-open-revisions').addEventListener('click', openRevisionsModal);
+
+// Um documento é uma REVISÃO válida quando tem o campo "people" (mesmo vazio).
+// Documentos sem esse campo (ex: "excel-000001" com nome/funcao direto no topo)
+// são sobras da v1 do app (uma pessoa por documento) e não devem ser tratados como revisão.
+let legacyDocIds = [];
+
+async function openRevisionsModal(){
+  const list = $('revisions-list');
+  list.innerHTML = '<div class="empty-state">Carregando revisões…</div>';
+  $('legacy-warning').style.display = 'none';
+  legacyDocIds = [];
+  $('modal-revisions').classList.add('show');
+  try {
+    const snap = await getDocs(collection(db, COLLECTION_NAME));
+    const revisions = [];
+    snap.forEach(d => {
+      const data = d.data();
+      if (data && typeof data.people === 'object' && data.people !== null) {
+        revisions.push({ id: d.id, ...data });
+      } else {
+        legacyDocIds.push(d.id);
+      }
+    });
+    if (legacyDocIds.length) {
+      $('legacy-count').textContent = legacyDocIds.length;
+      $('legacy-warning').style.display = 'block';
+    }
+    revisions.sort((a,b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+    if (!revisions.length) {
+      list.innerHTML = '<div class="empty-state">Nenhuma revisão salva ainda.</div>';
+      return;
+    }
+    list.innerHTML = revisions.map(r => `
+      <div class="rev-item">
+        <div>
+          <div class="rev-item-label">${escapeHtml(r.label || r.id)}</div>
+          <div class="rev-item-meta">${Object.keys(r.people || {}).length} pessoas · atualizado em ${fmtDateTimeBR(r.updatedAt || r.createdAt)}</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-primary" data-id="${r.id}" data-action="load-revision">Carregar</button>
+          <button class="btn btn-danger" data-id="${r.id}" data-label="${escapeHtml(r.label || r.id)}" data-action="delete-revision">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    list.innerHTML = `<div class="empty-state">Erro ao carregar revisões (${err.code || err.message}).</div>`;
+  }
+}
+$('btn-clean-legacy').addEventListener('click', async () => {
+  if (!legacyDocIds.length) return;
+  if (!confirm(`Excluir definitivamente ${legacyDocIds.length} documento(s) antigo(s) da coleção "${COLLECTION_NAME}"? Esta ação não pode ser desfeita.`)) return;
+  $('btn-clean-legacy').disabled = true;
+  $('btn-clean-legacy').textContent = 'Excluindo…';
+  let ok = 0, fail = 0;
+  for (const id of legacyDocIds) {
+    try { await deleteDoc(doc(db, COLLECTION_NAME, id)); ok++; }
+    catch { fail++; }
+  }
+  alert(`Limpeza concluída: ${ok} excluído(s)${fail ? `, ${fail} falharam` : ''}.`);
+  openRevisionsModal();
+});
+$('btn-cancel-revisions').addEventListener('click', () => $('modal-revisions').classList.remove('show'));
+$('revisions-list').addEventListener('click', async (e) => {
+  const loadBtn = e.target.closest('button[data-action="load-revision"]');
+  if (loadBtn) {
+    await loadRevision(loadBtn.dataset.id);
+    $('modal-revisions').classList.remove('show');
+    return;
+  }
+  const delBtn = e.target.closest('button[data-action="delete-revision"]');
+  if (delBtn) {
+    const id = delBtn.dataset.id, label = delBtn.dataset.label;
+    if (!confirm(`Excluir definitivamente a revisão "${label}"? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await deleteDoc(doc(db, COLLECTION_NAME, id));
+      if (currentRevisionId === id) { currentRevisionId = null; currentRevisionLabel = null; currentRevisionUpdatedAt = null; refreshRevisionBar(); }
+      openRevisionsModal();
+    } catch (err) {
+      alert('Erro ao excluir: ' + (err.code || err.message));
+    }
+  }
+});
+
+async function loadRevision(id){
+  try {
+    const snap = await getDoc(doc(db, COLLECTION_NAME, id));
+    if (!snap.exists()) { alert('Revisão não encontrada.'); return; }
+    const data = snap.data();
+    STATE = { people: data.people || {}, funcaoTipoMap: data.funcaoTipoMap || {} };
+    currentRevisionId = id;
+    currentRevisionLabel = data.label || id;
+    currentRevisionUpdatedAt = data.updatedAt || data.createdAt || null;
+    $('status-banner').classList.remove('show');
+    markSaved();
+    refreshRevisionBar();
+    render();
+  } catch (err) {
+    alert('Erro ao carregar revisão: ' + (err.code || err.message));
+  }
+}
+
+$('btn-save-new-revision').addEventListener('click', () => {
+  if (currentRevisionId) {
+    const ok = confirm(
+      `Você já tem a revisão "${currentRevisionLabel}" carregada.\n\n` +
+      `"Salvar Nova Revisão" cria um documento SEPARADO no Firebase (mantendo esta intacta) — use isso só para começar um mês novo.\n\n` +
+      `Se a intenção é apenas salvar as alterações desta MESMA revisão (ex: uma classificação, uma pessoa nova no meio do mês), cancele aqui e use "💾 Salvar Atualização" em vez disso.\n\n` +
+      `Continuar e criar uma revisão nova?`
+    );
+    if (!ok) return;
+  }
+  const suggestion = new Date().toLocaleDateString('pt-BR', {month:'long', year:'numeric'});
+  $('f-rev-label').value = currentRevisionLabel ? '' : suggestion.charAt(0).toUpperCase() + suggestion.slice(1);
+  $('modal-new-revision').classList.add('show');
+});
+$('btn-cancel-new-revision').addEventListener('click', () => $('modal-new-revision').classList.remove('show'));
+$('btn-confirm-new-revision').addEventListener('click', async () => {
+  const label = $('f-rev-label').value.trim();
+  if (!label) { alert('Dê um nome para a revisão (ex: Setembro/2026).'); return; }
+  const id = `rev-${Date.now()}`;
+  const now = new Date().toISOString();
+  const payload = { label, createdAt: now, updatedAt: now, people: STATE.people, funcaoTipoMap: STATE.funcaoTipoMap };
+  try {
+    if (AUTH_READY) await setDoc(doc(db, COLLECTION_NAME, id), payload);
+    currentRevisionId = id; currentRevisionLabel = label; currentRevisionUpdatedAt = now;
+    markSaved(); refreshRevisionBar();
+    $('modal-new-revision').classList.remove('show');
+    alert(`Revisão "${label}" salva com sucesso.`);
+  } catch (err) {
+    alert('Erro ao salvar nova revisão: ' + (err.code || err.message));
+  }
+});
+
+$('btn-update-revision').addEventListener('click', async () => {
+  if (!currentRevisionId) return;
+  const now = new Date().toISOString();
+  try {
+    if (AUTH_READY) {
+      await setDoc(doc(db, COLLECTION_NAME, currentRevisionId), {
+        people: STATE.people, funcaoTipoMap: STATE.funcaoTipoMap, updatedAt: now
+      }, { merge: true });
+    }
+    currentRevisionUpdatedAt = now;
+    markSaved(); refreshRevisionBar();
+    alert(`Revisão "${currentRevisionLabel}" atualizada.`);
+  } catch (err) {
+    alert('Erro ao salvar atualização: ' + (err.code || err.message));
+  }
+});
+
+// ============ IMPORTAÇÃO DE EXCEL (com diff) ============
+$('excel-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+  if (!rows.length) { alert('Planilha vazia.'); return; }
+
+  const header = rows[0].map(h => String(h).trim().toLowerCase());
+  const idx = {
+    chapa: header.findIndex(h => h.includes('chapa')),
+    nome: header.findIndex(h => h.includes('nome') && !h.includes('fun')),
+    funcao: header.findIndex(h => h.includes('fun')),
+    salario: header.findIndex(h => h.includes('salário') || h.includes('salario')),
+    admissao: header.findIndex(h => h.includes('admiss')),
+    demissao: header.findIndex(h => h.includes('demiss')),
+    tipo: header.findIndex(h => h.includes('m.o') || h.includes('mão de obra') || h.includes('mao de obra')),
+  };
+  if (idx.nome === -1 || idx.admissao === -1) {
+    alert('Não foi possível identificar as colunas "Nome" e "Data de Admissão" na planilha. Verifique o cabeçalho.');
+    return;
+  }
+
+  // snapshot ANTES de aplicar o import (para diff)
+  const oldPeople = JSON.parse(JSON.stringify(STATE.people));
+
+  const dataRows = rows.slice(1).filter(r => r[idx.nome] && String(r[idx.nome]).trim() !== '');
+  const novos = [], alterados = [], demitidosDetectados = [];
+  const newExcelIds = new Set();
+
+  for (const r of dataRows) {
+    const chapaRaw = idx.chapa !== -1 ? String(r[idx.chapa]).trim() : '';
+    const docId = chapaRaw ? `excel-${chapaRaw}` : `excel-noid-${String(r[idx.nome]).trim().replace(/\s+/g,'_')}`;
+    newExcelIds.add(docId);
+    const old = oldPeople[docId];
+
+    const funcao = idx.funcao !== -1 ? String(r[idx.funcao]).trim() : '';
+    const tipoFromExcel = idx.tipo !== -1 ? parseTipoMOCell(r[idx.tipo]) : '';
+    const tipoMO = tipoFromExcel || (old ? (old.tipoMO || '') : '') || tipoFromMap(funcao);
+    if (tipoFromExcel && funcao) STATE.funcaoTipoMap[funcao.toUpperCase()] = tipoFromExcel;
+    const person = {
+      chapa: chapaRaw,
+      nome: String(r[idx.nome]).trim(),
+      funcao,
+      empresa: 'Consórcio',
+      salario: idx.salario !== -1 && r[idx.salario] !== '' ? Number(r[idx.salario]) : null,
+      dataAdmissao: parseDateCell(r[idx.admissao]),
+      dataDemissao: idx.demissao !== -1 ? parseDateCell(r[idx.demissao]) : '',
+      origem: 'excel',
+      tipoMO,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (!old) {
+      novos.push(person);
+    } else {
+      if (!old.dataDemissao && person.dataDemissao) {
+        demitidosDetectados.push({ nome: person.nome, data: person.dataDemissao });
+      }
+      const changes = [];
+      if ((old.funcao || '') !== person.funcao) changes.push(`função: "${old.funcao || '—'}" → "${person.funcao || '—'}"`);
+      if ((old.salario ?? null) !== person.salario) changes.push(`salário: ${fmtMoney(old.salario)} → ${fmtMoney(person.salario)}`);
+      if ((old.dataAdmissao || '') !== person.dataAdmissao) changes.push(`admissão: ${fmtDateBR(old.dataAdmissao)} → ${fmtDateBR(person.dataAdmissao)}`);
+      if ((old.tipoMO || '') !== person.tipoMO) changes.push(`tipo M.O.: "${old.tipoMO || 'não classificado'}" → "${person.tipoMO || 'não classificado'}"`);
+      if (changes.length) alterados.push({ nome: person.nome, changes });
+    }
+    STATE.people[docId] = person;
+  }
+
+  // pessoas que estavam ativas, vieram do excel antes, e sumiram da nova planilha
+  const sumidos = Object.entries(oldPeople)
+    .filter(([id, p]) => p.origem === 'excel' && !p.dataDemissao && !newExcelIds.has(id))
+    .map(([id, p]) => ({ id, nome: p.nome }));
+
+  markUnsaved();
+  render();
+  showImportSummary({ fileName: file.name, total: dataRows.length, novos, alterados, demitidosDetectados, sumidos });
+});
+
+function showImportSummary({ fileName, total, novos, alterados, demitidosDetectados, sumidos }){
+  $('import-sub').textContent = `Planilha: ${fileName} · ${total} linhas lidas · comparado contra a revisão "${currentRevisionLabel || '(nenhuma — primeira carga)'}"`;
+  let html = '';
+
+  html += `<div class="diff-section"><h4 style="color:var(--ativo);">✅ Novos ingressos (${novos.length})</h4>`;
+  html += novos.length
+    ? `<ul class="diff-list">${novos.map(p => `<li><span>${escapeHtml(p.nome)} <span class="muted">— ${escapeHtml(p.funcao||'')}</span></span><span class="tag-novo">Admitido ${fmtDateBR(p.dataAdmissao)}</span></li>`).join('')}</ul>`
+    : `<div class="muted">Nenhum.</div>`;
+  html += `</div>`;
+
+  html += `<div class="diff-section"><h4 style="color:var(--demitido);">🔴 Demissões detectadas (${demitidosDetectados.length})</h4>`;
+  html += demitidosDetectados.length
+    ? `<ul class="diff-list">${demitidosDetectados.map(p => `<li><span>${escapeHtml(p.nome)}</span><span class="tag-dem">Demitido em ${fmtDateBR(p.data)}</span></li>`).join('')}</ul>`
+    : `<div class="muted">Nenhuma.</div>`;
+  html += `</div>`;
+
+  html += `<div class="diff-section"><h4 style="color:#b8860b;">✏️ Alterações de cadastro (${alterados.length})</h4>`;
+  html += alterados.length
+    ? `<ul class="diff-list">${alterados.map(p => `<li style="flex-direction:column; align-items:flex-start;"><b>${escapeHtml(p.nome)}</b><span class="muted">${p.changes.map(escapeHtml).join(' · ')}</span></li>`).join('')}</ul>`
+    : `<div class="muted">Nenhuma.</div>`;
+  html += `</div>`;
+
+  html += `<div class="diff-section"><h4 style="color:#b8860b;">⚠️ Sumiram da planilha — sem data de demissão informada (${sumidos.length})</h4>`;
+  html += sumidos.length
+    ? `<ul class="diff-list">${sumidos.map(p => `<li><span>${escapeHtml(p.nome)}</span><button class="mini-btn" data-mark-demitido="${p.id}">Marcar demissão hoje</button></li>`).join('')}</ul>
+       <div class="muted" style="margin-top:6px;">Essas pessoas estavam ativas na revisão anterior e não vieram na nova planilha. Não foram removidas automaticamente — confirme se saíram e marque a demissão.</div>`
+    : `<div class="muted">Nenhuma.</div>`;
+  html += `</div>`;
+
+  $('import-summary-content').innerHTML = html;
+  $('modal-import').classList.add('show');
+}
+$('btn-close-import').addEventListener('click', () => $('modal-import').classList.remove('show'));
+$('import-summary-content').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-mark-demitido]');
+  if (!btn) return;
+  const id = btn.dataset.markDemitido;
+  if (STATE.people[id]) {
+    STATE.people[id].dataDemissao = new Date().toISOString().slice(0,10);
+    markUnsaved();
+    btn.textContent = 'Marcado ✓';
+    btn.disabled = true;
+    render();
+  }
+});
+
+// ============ CLASSIFICAR TIPO DE M.O. POR FUNÇÃO ============
+$('btn-classify').addEventListener('click', () => {
+  const funcaoCount = {};
+  Object.values(STATE.people).forEach(p => {
+    const key = (p.funcao || '(sem função)').trim();
+    funcaoCount[key] = (funcaoCount[key] || 0) + 1;
+  });
+  const funcoes = Object.keys(funcaoCount).sort();
+  if (!funcoes.length) { alert('Nenhuma função cadastrada ainda.'); return; }
+
+  $('classify-list').innerHTML = funcoes.map(fn => {
+    const current = STATE.funcaoTipoMap[fn.toUpperCase()] || '';
+    return `
+      <div class="class-row">
+        <div>
+          <div class="fn-name">${escapeHtml(fn)}</div>
+          <div class="fn-count">${funcaoCount[fn]} pessoa(s)</div>
+        </div>
+        <select data-funcao="${escapeHtml(fn)}">
+          <option value="" ${current==='' ? 'selected':''}>Não classificado</option>
+          <option value="Direta" ${current==='Direta' ? 'selected':''}>Direta</option>
+          <option value="Indireta" ${current==='Indireta' ? 'selected':''}>Indireta</option>
+        </select>
+      </div>
+    `;
+  }).join('');
+  $('modal-classify').classList.add('show');
+});
+$('btn-cancel-classify').addEventListener('click', () => $('modal-classify').classList.remove('show'));
+$('btn-save-classify').addEventListener('click', () => {
+  const selects = $('classify-list').querySelectorAll('select[data-funcao]');
+  selects.forEach(sel => {
+    const funcao = sel.dataset.funcao;
+    const value = sel.value;
+    const key = funcao.toUpperCase();
+    if (value) STATE.funcaoTipoMap[key] = value; else delete STATE.funcaoTipoMap[key];
+    Object.values(STATE.people).forEach(p => {
+      if ((p.funcao || '').trim() === funcao) p.tipoMO = value;
+    });
+  });
+  markUnsaved();
+  $('modal-classify').classList.remove('show');
+  render();
+});
+
+// ============ MODAL ADICIONAR/EDITAR PESSOA ============
+let editingId = null;
+$('btn-add-person').addEventListener('click', () => openPersonModal(null));
+
+function openPersonModal(docId){
+  editingId = docId;
+  const p = docId ? STATE.people[docId] : null;
+  $('modal-person-title').textContent = docId ? 'Editar Pessoa' : 'Adicionar Pessoa';
+  $('f-nome').value = p ? p.nome : '';
+  $('f-funcao').value = p ? p.funcao : '';
+  $('f-chapa').value = p ? p.chapa : '';
+  $('f-empresa').value = p ? p.empresa : '';
+  $('f-tipo').value = p ? (p.tipoMO || '') : '';
+  $('f-admissao').value = p ? p.dataAdmissao : '';
+  $('f-demissao').value = p ? p.dataDemissao : '';
+  $('f-salario').value = p && p.salario !== null && p.salario !== undefined ? p.salario : '';
+  $('btn-remove-demissao').style.display = (p && p.dataDemissao) ? 'inline-flex' : 'none';
+
+  const datalist = $('lista-empresas');
+  const empresas = new Set(Object.values(STATE.people).map(x => x.empresa).filter(Boolean));
+  datalist.innerHTML = [...empresas].map(e => `<option value="${escapeHtml(e)}">`).join('');
+
+  $('modal-person').classList.add('show');
+}
+$('btn-cancel-person').addEventListener('click', () => $('modal-person').classList.remove('show'));
+$('btn-remove-demissao').addEventListener('click', () => { $('f-demissao').value = ''; });
+
+$('btn-save-person').addEventListener('click', () => {
+  const nome = $('f-nome').value.trim();
+  const empresa = $('f-empresa').value.trim();
+  const admissao = $('f-admissao').value;
+  if (!nome || !empresa || !admissao) { alert('Preencha Nome, Empresa e Data de Admissão.'); return; }
+  const existing = editingId ? STATE.people[editingId] : null;
+  const docId = editingId || `manual-${Date.now()}`;
+  const funcao = $('f-funcao').value.trim();
+  STATE.people[docId] = {
+    chapa: $('f-chapa').value.trim(),
+    nome, funcao, empresa,
+    tipoMO: $('f-tipo').value,
+    salario: $('f-salario').value ? Number($('f-salario').value) : null,
+    dataAdmissao: admissao,
+    dataDemissao: $('f-demissao').value || '',
+    origem: existing ? existing.origem : 'manual',
+    updatedAt: new Date().toISOString()
+  };
+  markUnsaved();
+  $('modal-person').classList.remove('show');
+  render();
+});
+
+// ============ EXCLUIR / EDITAR NA TABELA ============
+let pendingDeleteId = null;
+$('btn-cancel-confirm').addEventListener('click', () => $('modal-confirm').classList.remove('show'));
+$('btn-confirm-yes').addEventListener('click', () => {
+  if (pendingDeleteId) {
+    delete STATE.people[pendingDeleteId];
+    pendingDeleteId = null;
+    markUnsaved();
+    $('modal-confirm').classList.remove('show');
+    render();
+  }
+});
+$('table-body').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const docId = btn.dataset.id;
+  if (btn.classList.contains('edit-btn')) openPersonModal(docId);
+  if (btn.classList.contains('delete-btn')) {
+    pendingDeleteId = docId;
+    $('confirm-text').textContent = `Excluir o registro de "${STATE.people[docId].nome}"? Esta ação não pode ser desfeita.`;
+    $('modal-confirm').classList.add('show');
+  }
+});
+
+// ============ FILTROS ============
+['filter-status','filter-empresa','filter-tipo','filter-busca','toggle-salario'].forEach(id => {
+  $(id).addEventListener('input', render);
+  $(id).addEventListener('change', render);
+});
+
+// ============ RENDER ============
+let chartInstance = null;
+
+function render(){
+  refreshRevisionBar();
+  const people = Object.entries(STATE.people).map(([id, p]) => ({id, ...p}));
+  const hasData = people.length > 0;
+  $('status-banner').classList.toggle('show', !hasData && !currentRevisionId);
+
+  const empresaSelect = $('filter-empresa');
+  const empresasAtuais = [...new Set(people.map(p => p.empresa).filter(Boolean))].sort();
+  const currentVal = empresaSelect.value;
+  empresaSelect.innerHTML = '<option value="todas">Todas</option>' + empresasAtuais.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join('');
+  if (empresasAtuais.includes(currentVal)) empresaSelect.value = currentVal;
+
+  const statusF = $('filter-status').value;
+  const empresaF = $('filter-empresa').value;
+  const tipoF = $('filter-tipo').value;
+  const buscaF = $('filter-busca').value.trim().toLowerCase();
+  const mostrarSalario = $('toggle-salario').checked;
+  $('th-salario').style.display = mostrarSalario ? '' : 'none';
+
+  let filtered = people.filter(p => {
+    if (statusF === 'ativo' && !isAtivo(p)) return false;
+    if (statusF === 'demitido' && isAtivo(p)) return false;
+    if (empresaF !== 'todas' && p.empresa !== empresaF) return false;
+    if (tipoF !== 'todos' && (p.tipoMO || '') !== tipoF) return false;
+    if (buscaF) {
+      const alvo = `${p.nome} ${p.funcao}`.toLowerCase();
+      if (!alvo.includes(buscaF)) return false;
+    }
+    return true;
+  });
+  filtered.sort((a,b) => (a.nome || '').localeCompare(b.nome || ''));
+
+  const ativos = people.filter(isAtivo);
+  const ativosConsorcio = ativos.filter(p => p.empresa === 'Consórcio').length;
+  const ativosConsorciadas = ativos.length - ativosConsorcio;
+  const ativosDireta = ativos.filter(p => p.tipoMO === 'Direta').length;
+  const ativosIndireta = ativos.filter(p => p.tipoMO === 'Indireta').length;
+  const hoje = new Date();
+  const limite30 = new Date(hoje.getTime() - 30*86400*1000);
+  const admitidos30 = people.filter(p => p.dataAdmissao && new Date(p.dataAdmissao) >= limite30).length;
+  const demitidos30 = people.filter(p => p.dataDemissao && new Date(p.dataDemissao) >= limite30).length;
+
+  $('kpi-ativo-total').textContent = ativos.length;
+  $('kpi-ativo-consorcio').textContent = ativosConsorcio;
+  $('kpi-ativo-consorciadas').textContent = ativosConsorciadas;
+  $('kpi-ativo-direta').textContent = ativosDireta;
+  $('kpi-ativo-indireta').textContent = ativosIndireta;
+  $('kpi-admitidos-30').textContent = admitidos30;
+  $('kpi-demitidos-30').textContent = demitidos30;
+  $('kpi-total-registros').textContent = people.length;
+
+  const tbody = $('table-body');
+  $('table-empty').style.display = filtered.length ? 'none' : 'block';
+  tbody.innerHTML = filtered.map(p => `
+    <tr>
+      <td>${escapeHtml(p.nome || '')}</td>
+      <td>${escapeHtml(p.funcao || '')}</td>
+      <td>${escapeHtml(p.empresa || '')}</td>
+      <td>${p.tipoMO ? `<span class="badge ${p.tipoMO === 'Direta' ? 'badge-direta' : 'badge-indireta'}">${p.tipoMO}</span>` : `<span class="badge badge-naoclass">—</span>`}</td>
+      <td style="display:${mostrarSalario ? '' : 'none'}">${fmtMoney(p.salario)}</td>
+      <td>${fmtDateBR(p.dataAdmissao)}</td>
+      <td>${fmtDateBR(p.dataDemissao)}</td>
+      <td><span class="badge ${isAtivo(p) ? 'badge-ativo' : 'badge-demitido'}">${isAtivo(p) ? 'Ativo' : 'Demitido'}</span></td>
+      <td><span class="badge badge-origem">${p.origem === 'manual' ? 'Manual' : 'Excel'}</span></td>
+      <td>
+        <div class="row-actions">
+          <button class="icon-btn edit-btn" data-id="${p.id}" title="Editar">✏️</button>
+          <button class="icon-btn delete-btn" data-id="${p.id}" title="Excluir">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  const filtrosAtivos = statusF !== 'todos' || empresaF !== 'todas' || tipoF !== 'todos' || !!buscaF;
+  $('chart-filter-note').textContent = filtrosAtivos
+    ? `Considerando ${filtered.length} registro(s) com os filtros aplicados acima.`
+    : '';
+
+  renderChart(filtered);
+}
+
+function renderChart(people){
+  const chartEmpty = $('chart-empty');
+  const canvas = $('chart-evolucao');
+  const comData = people.filter(p => p.dataAdmissao);
+  if (!comData.length) {
+    chartEmpty.style.display = 'block'; canvas.style.display = 'none';
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    return;
+  }
+  chartEmpty.style.display = 'none'; canvas.style.display = 'block';
+
+  const admDates = comData.map(p => p.dataAdmissao).filter(Boolean);
+  const demDates = comData.map(p => p.dataDemissao).filter(Boolean);
+  const minDate = new Date(Math.min(...admDates.map(d => new Date(d))));
+  const maxRef = demDates.length ? new Date(Math.max(...demDates.map(d => new Date(d)))) : new Date();
+  const maxDate = maxRef > new Date() ? maxRef : new Date();
+
+  const months = [];
+  let cursor = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+  const end = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+  while (cursor <= end) { months.push(new Date(cursor)); cursor.setMonth(cursor.getMonth() + 1); }
+
+  const labels = months.map(m => m.toLocaleDateString('pt-BR', {month:'short', year:'2-digit'}));
+  const series = months.map(m => {
+    const refDate = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+    return comData.filter(p => {
+      const adm = new Date(p.dataAdmissao);
+      const dem = p.dataDemissao ? new Date(p.dataDemissao) : null;
+      return adm <= refDate && (!dem || dem > refDate);
+    }).length;
+  });
+
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Efetivo Ativo', data: series, borderColor: '#00144D', backgroundColor: 'rgba(0,20,77,0.08)', fill: true, tension: 0.25, pointRadius: 3 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+refreshRevisionBar();
+render();
+</script>
+</body>
+</html>
