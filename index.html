@@ -161,6 +161,7 @@
     </div>
   </div>
   <div class="header-right">
+    <div id="obra-info" style="font-weight:600;"></div>
     <div id="conn-status">🔄 Conectando…</div>
     <div id="user-area" style="display:none;"><span id="user-email"></span> · <a href="#" id="btn-logout" style="color:#fff;">Sair</a></div>
   </div>
@@ -172,6 +173,10 @@
 </div>
 
 <main>
+
+  <div class="status-banner show" id="sem-acesso-banner" style="display:none;">
+    🔒 Você não tem acesso ao Controle de Efetivo nesta obra. Peça ao gestor da obra para liberar em <a href="https://kzplanejamentoecustos-boop.github.io/PortalKZ/">Portal KZ</a> &gt; Equipe da obra.
+  </div>
 
   <div class="status-banner" id="status-banner">
     ⚠️ Nenhuma revisão carregada ainda. Clique em <b>"Carregar Revisão"</b> para trazer o mês anterior, ou comece uma nova importando o Excel direto.
@@ -261,7 +266,7 @@
 
 </main>
 
-<footer>Controle de Efetivo · CTC Infra · v2.0 · Revisões salvas na coleção <b>"Controle de Efetivo"</b> (Firebase)</footer>
+<footer>Controle de Efetivo · KZ Planejamento · v3.0 · Dados separados por obra no Firebase · <a href="https://kzplanejamentoecustos-boop.github.io/PortalKZ/">Portal KZ</a></footer>
 
 <!-- ===== Modal: Adicionar/Editar Pessoa ===== -->
 <div class="modal-overlay" id="modal-person">
@@ -367,6 +372,17 @@
   </div>
 </div>
 
+<!-- Aberto sem obra: o Efetivo precisa saber de qual obra são os dados -->
+<div class="modal-overlay" id="modal-sem-obra">
+  <div class="modal">
+    <h3>Escolha a obra no Portal KZ</h3>
+    <div class="modal-sub">O Controle de Efetivo agora guarda os dados separados por obra. Abra-o pelo Portal KZ, escolhendo a obra e clicando em "Abrir".</div>
+    <div class="modal-actions">
+      <a class="btn btn-primary" href="https://kzplanejamentoecustos-boop.github.io/PortalKZ/">Ir para o Portal KZ</a>
+    </div>
+  </div>
+</div>
+
 <!-- Login obrigatório (Firebase Authentication - e-mail e senha). Não pode ser fechado sem entrar. -->
 <div class="modal-overlay" id="modal-login">
   <div class="modal">
@@ -407,7 +423,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const COLLECTION_NAME = "Controle de Efetivo";
+// ============ OBRA (Portal KZ) ============
+// Os dados ficam em obras/{obra}/efetivo. A obra vem do Portal KZ (?obra=wsf3);
+// sem ela, usa a última obra escolhida no Portal neste navegador.
+const PORTAL_URL = 'https://kzplanejamentoecustos-boop.github.io/PortalKZ/';
+const CONTROLE = 'efetivo';
+const OBRA = (() => {
+  let o = new URLSearchParams(location.search).get('obra');
+  if (!o) { try { o = localStorage.getItem('kz-portal-obra'); } catch { o = null; } }
+  return String(o || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+})();
+const colecaoObra = () => collection(db, 'obras', OBRA, CONTROLE);
+const docObra = (id) => doc(db, 'obras', OBRA, CONTROLE, id);
+const COLLECTION_NAME = `Efetivo da obra ${OBRA.toUpperCase()}`;
+const NOME_PAPEL = { leitor: 'Leitor', editor: 'Editor', admin: 'Admin' };
+let PAPEL = '';          // '', 'leitor', 'editor', 'admin' (só para a tela; quem garante são as regras)
 
 let AUTH_READY = false;
 const $ = (id) => document.getElementById(id);
@@ -435,9 +465,43 @@ logoInput.addEventListener('change', (e) => {
 });
 
 // ============ AUTENTICAÇÃO ============
-// Login real por e-mail e senha. Quem pode ler/editar é decidido pelas regras do Firestore
-// (documento "acessos/{uid}"), não por esta tela: sem permissão, o banco recusa.
+// Login do Firebase (o mesmo do Portal KZ). Quem pode ler/editar é decidido pelas regras
+// do Firestore (equipe da obra no Portal), não por esta tela: sem permissão, o banco recusa.
 let USER_EMAIL = '';
+
+/** Lê o perfil da pessoa nesta obra (gestor geral, gestor da obra ou papel no Efetivo). */
+async function carregarAcessoObra(user){
+  PAPEL = '';
+  if (!OBRA) { $('modal-sem-obra').classList.add('show'); return; }
+  try {
+    const [gg, membro, obra] = await Promise.all([
+      getDoc(doc(db, 'gestores_gerais', user.uid)),
+      getDoc(doc(db, 'obras', OBRA, 'membros', user.uid)),
+      getDoc(doc(db, 'obras', OBRA)),
+    ]);
+    if (!obra.exists()) { $('obra-info').textContent = `Obra "${OBRA}" não encontrada`; return; }
+    const o = obra.data();
+    if (gg.exists()) PAPEL = 'admin';
+    else if (membro.exists()) {
+      const m = membro.data(), p = m.papeis || {};
+      PAPEL = m.gestor ? 'admin' : (p[CONTROLE] || p['*'] || '');
+      if (!NOME_PAPEL[PAPEL]) PAPEL = '';
+    }
+    $('obra-info').textContent = `${o.nome} (${o.sigla}) · ${PAPEL ? NOME_PAPEL[PAPEL] : 'sem acesso'}`;
+  } catch (err) {
+    $('obra-info').textContent = 'Não foi possível ler o acesso: ' + msgErroBanco(err);
+  }
+  aplicarPermissoes();
+}
+function podeEditar(){ return PAPEL === 'editor' || PAPEL === 'admin'; }
+function aplicarPermissoes(){
+  const editar = podeEditar();
+  $('btn-save-new-revision').disabled = !editar;
+  $('btn-save-new-revision').title = editar ? '' : 'Seu perfil nesta obra não permite salvar';
+  if (!editar) { $('btn-update-revision').disabled = true; $('btn-update-revision').title = 'Seu perfil nesta obra não permite salvar'; }
+  $('sem-acesso-banner').style.display = PAPEL ? 'none' : '';
+}
+
 onAuthStateChanged(auth, (user) => {
   if (user && !user.isAnonymous) {
     AUTH_READY = true; USER_EMAIL = user.email || '';
@@ -445,6 +509,7 @@ onAuthStateChanged(auth, (user) => {
     $('user-email').textContent = USER_EMAIL;
     $('user-area').style.display = '';
     $('modal-login').classList.remove('show');
+    carregarAcessoObra(user);
   } else {
     if (user) signOut(auth); // encerra sessões anônimas da versão anterior
     AUTH_READY = false; USER_EMAIL = '';
@@ -484,9 +549,12 @@ $('btn-logout').addEventListener('click', async (e) => {
   if (!$('rev-dot').classList.contains('unsaved') || confirm('Há alterações não salvas. Sair mesmo assim?')) await signOut(auth);
 });
 // Bloqueia gravação sem login (antes, o app dizia "salvo" mesmo sem gravar).
-function exigirLogin(){ if (!AUTH_READY) { $('modal-login').classList.add('show'); throw { message: 'faça login para salvar.' }; } }
+function exigirLogin(){
+  if (!AUTH_READY) { $('modal-login').classList.add('show'); throw { message: 'faça login para salvar.' }; }
+  if (!podeEditar()) throw { message: 'seu perfil nesta obra não permite salvar (peça ao gestor da obra no Portal KZ).' };
+}
 function msgErroBanco(err){
-  if (err && err.code === 'permission-denied') return 'seu usuário não tem permissão para esta ação. Peça acesso ao administrador.';
+  if (err && err.code === 'permission-denied') return 'seu usuário não tem permissão para esta ação nesta obra. Peça acesso ao gestor da obra no Portal KZ.';
   return (err && (err.code || err.message)) || 'erro desconhecido';
 }
 
@@ -534,8 +602,8 @@ function refreshRevisionBar(){
   if (currentRevisionId) {
     $('rev-label').textContent = `Revisão: ${currentRevisionLabel}`;
     $('rev-meta').textContent = currentRevisionUpdatedAt ? `Última atualização: ${fmtDateTimeBR(currentRevisionUpdatedAt)}` : '';
-    $('btn-update-revision').disabled = false;
-    $('btn-update-revision').title = '';
+    $('btn-update-revision').disabled = !podeEditar();
+    $('btn-update-revision').title = podeEditar() ? '' : 'Seu perfil nesta obra não permite salvar';
   } else {
     $('rev-label').textContent = 'Nenhuma revisão carregada';
     $('rev-meta').textContent = '';
@@ -558,7 +626,7 @@ async function openRevisionsModal(){
   legacyDocIds = [];
   $('modal-revisions').classList.add('show');
   try {
-    const snap = await getDocs(collection(db, COLLECTION_NAME));
+    const snap = await getDocs(colecaoObra());
     const revisions = [];
     snap.forEach(d => {
       const data = d.data();
@@ -595,12 +663,13 @@ async function openRevisionsModal(){
 }
 $('btn-clean-legacy').addEventListener('click', async () => {
   if (!legacyDocIds.length) return;
+  if (PAPEL !== 'admin') { alert('Somente o Admin do Efetivo ou o gestor da obra pode excluir.'); return; }
   if (!confirm(`Excluir definitivamente ${legacyDocIds.length} documento(s) antigo(s) da coleção "${COLLECTION_NAME}"? Esta ação não pode ser desfeita.`)) return;
   $('btn-clean-legacy').disabled = true;
   $('btn-clean-legacy').textContent = 'Excluindo…';
   let ok = 0, fail = 0;
   for (const id of legacyDocIds) {
-    try { await deleteDoc(doc(db, COLLECTION_NAME, id)); ok++; }
+    try { await deleteDoc(docObra(id)); ok++; }
     catch { fail++; }
   }
   alert(`Limpeza concluída: ${ok} excluído(s)${fail ? `, ${fail} falharam` : ''}.`);
@@ -617,9 +686,10 @@ $('revisions-list').addEventListener('click', async (e) => {
   const delBtn = e.target.closest('button[data-action="delete-revision"]');
   if (delBtn) {
     const id = delBtn.dataset.id, label = delBtn.dataset.label;
+    if (PAPEL !== 'admin') { alert('Somente o Admin do Efetivo ou o gestor da obra pode excluir revisões.'); return; }
     if (!confirm(`Excluir definitivamente a revisão "${label}"? Esta ação não pode ser desfeita.`)) return;
     try {
-      await deleteDoc(doc(db, COLLECTION_NAME, id));
+      await deleteDoc(docObra(id));
       if (currentRevisionId === id) { currentRevisionId = null; currentRevisionLabel = null; currentRevisionUpdatedAt = null; refreshRevisionBar(); }
       openRevisionsModal();
     } catch (err) {
@@ -630,7 +700,7 @@ $('revisions-list').addEventListener('click', async (e) => {
 
 async function loadRevision(id){
   try {
-    const snap = await getDoc(doc(db, COLLECTION_NAME, id));
+    const snap = await getDoc(docObra(id));
     if (!snap.exists()) { alert('Revisão não encontrada.'); return; }
     const data = snap.data();
     STATE = { people: data.people || {}, funcaoTipoMap: data.funcaoTipoMap || {} };
@@ -669,7 +739,7 @@ $('btn-confirm-new-revision').addEventListener('click', async () => {
   const payload = { label, createdAt: now, updatedAt: now, createdBy: USER_EMAIL, updatedBy: USER_EMAIL, people: STATE.people, funcaoTipoMap: STATE.funcaoTipoMap };
   try {
     exigirLogin();
-    await setDoc(doc(db, COLLECTION_NAME, id), payload);
+    await setDoc(docObra(id), payload);
     currentRevisionId = id; currentRevisionLabel = label; currentRevisionUpdatedAt = now;
     markSaved(); refreshRevisionBar();
     $('modal-new-revision').classList.remove('show');
@@ -684,7 +754,7 @@ $('btn-update-revision').addEventListener('click', async () => {
   const now = new Date().toISOString();
   try {
     exigirLogin();
-    await setDoc(doc(db, COLLECTION_NAME, currentRevisionId), {
+    await setDoc(docObra(currentRevisionId), {
       people: STATE.people, funcaoTipoMap: STATE.funcaoTipoMap, updatedAt: now, updatedBy: USER_EMAIL
     }, { merge: true });
     currentRevisionUpdatedAt = now;
