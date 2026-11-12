@@ -117,6 +117,7 @@
   .field{margin-bottom:14px; display:flex; flex-direction:column; gap:5px;}
   .field label{font-size:12px; font-weight:600; color:var(--text-muted);}
   .field input, .field select{width:100%;}
+  #modal-login .field input{box-sizing:border-box;}
   .field-row{display:flex; gap:10px;}
   .field-row .field{flex:1;}
   .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:18px;}
@@ -161,6 +162,7 @@
   </div>
   <div class="header-right">
     <div id="conn-status">🔄 Conectando…</div>
+    <div id="user-area" style="display:none;"><span id="user-email"></span> · <a href="#" id="btn-logout" style="color:#fff;">Sair</a></div>
   </div>
 </header>
 
@@ -365,6 +367,23 @@
   </div>
 </div>
 
+<!-- Login obrigatório (Firebase Authentication - e-mail e senha). Não pode ser fechado sem entrar. -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal">
+    <h3>Entrar no Controle de Efetivo</h3>
+    <div class="modal-sub">Use o e-mail e a senha cadastrados pelo administrador. Sem login não é possível ver nem salvar dados.</div>
+    <form id="form-login">
+      <div class="field"><label>E-mail</label><input type="email" id="login-email" autocomplete="username" required></div>
+      <div class="field"><label>Senha</label><input type="password" id="login-senha" autocomplete="current-password" required></div>
+      <div id="login-erro" style="display:none; color:var(--demitido); font-size:12.5px; margin-bottom:10px;"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="btn-esqueci-senha" style="margin-right:auto;">Esqueci a senha</button>
+        <button type="submit" class="btn btn-primary" id="btn-login">Entrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 
@@ -373,7 +392,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/fireba
 import {
   getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCk1hdv3h8A2gDOcaZDRuRtceDiG2bvXOc",
@@ -416,8 +435,60 @@ logoInput.addEventListener('change', (e) => {
 });
 
 // ============ AUTENTICAÇÃO ============
-onAuthStateChanged(auth, (user) => { if (user) { AUTH_READY = true; $('conn-status').textContent = '🟢 Conectado'; } });
-signInAnonymously(auth).catch((err) => { $('conn-status').textContent = '🔴 Erro de conexão (' + err.code + ')'; });
+// Login real por e-mail e senha. Quem pode ler/editar é decidido pelas regras do Firestore
+// (documento "acessos/{uid}"), não por esta tela: sem permissão, o banco recusa.
+let USER_EMAIL = '';
+onAuthStateChanged(auth, (user) => {
+  if (user && !user.isAnonymous) {
+    AUTH_READY = true; USER_EMAIL = user.email || '';
+    $('conn-status').textContent = '🟢 Conectado';
+    $('user-email').textContent = USER_EMAIL;
+    $('user-area').style.display = '';
+    $('modal-login').classList.remove('show');
+  } else {
+    if (user) signOut(auth); // encerra sessões anônimas da versão anterior
+    AUTH_READY = false; USER_EMAIL = '';
+    $('conn-status').textContent = '🔒 Faça login';
+    $('user-area').style.display = 'none';
+    $('modal-login').classList.add('show');
+    setTimeout(() => $('login-email').focus(), 50);
+  }
+});
+function msgErroAuth(code){
+  return ({
+    'auth/invalid-credential': 'E-mail ou senha incorretos.',
+    'auth/invalid-email': 'E-mail inválido.',
+    'auth/user-disabled': 'Usuário desativado. Fale com o administrador.',
+    'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos ou redefina a senha.',
+    'auth/network-request-failed': 'Sem conexão com a internet.',
+    'auth/operation-not-allowed': 'Login por e-mail e senha não está ativado no Firebase.'
+  })[code] || ('Não foi possível entrar (' + code + ').');
+}
+function mostrarErroLogin(texto){ const el = $('login-erro'); el.textContent = texto; el.style.display = texto ? '' : 'none'; }
+$('form-login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mostrarErroLogin('');
+  $('btn-login').disabled = true; $('btn-login').textContent = 'Entrando…';
+  try { await signInWithEmailAndPassword(auth, $('login-email').value.trim(), $('login-senha').value); $('login-senha').value = ''; }
+  catch (err) { mostrarErroLogin(msgErroAuth(err.code)); }
+  finally { $('btn-login').disabled = false; $('btn-login').textContent = 'Entrar'; }
+});
+$('btn-esqueci-senha').addEventListener('click', async () => {
+  const email = $('login-email').value.trim();
+  if (!email) { mostrarErroLogin('Digite seu e-mail acima e clique de novo em "Esqueci a senha".'); return; }
+  try { await sendPasswordResetEmail(auth, email); } catch (err) { /* não revela se o e-mail existe */ }
+  mostrarErroLogin('Se o e-mail estiver cadastrado, você receberá um link para criar nova senha.');
+});
+$('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (!$('rev-dot').classList.contains('unsaved') || confirm('Há alterações não salvas. Sair mesmo assim?')) await signOut(auth);
+});
+// Bloqueia gravação sem login (antes, o app dizia "salvo" mesmo sem gravar).
+function exigirLogin(){ if (!AUTH_READY) { $('modal-login').classList.add('show'); throw { message: 'faça login para salvar.' }; } }
+function msgErroBanco(err){
+  if (err && err.code === 'permission-denied') return 'seu usuário não tem permissão para esta ação. Peça acesso ao administrador.';
+  return (err && (err.code || err.message)) || 'erro desconhecido';
+}
 
 // ============ HELPERS DE DATA ============
 function excelSerialToISO(serial){
@@ -519,7 +590,7 @@ async function openRevisionsModal(){
       </div>
     `).join('');
   } catch (err) {
-    list.innerHTML = `<div class="empty-state">Erro ao carregar revisões (${err.code || err.message}).</div>`;
+    list.innerHTML = `<div class="empty-state">Erro ao carregar revisões: ${escapeHtml(msgErroBanco(err))}</div>`;
   }
 }
 $('btn-clean-legacy').addEventListener('click', async () => {
@@ -552,7 +623,7 @@ $('revisions-list').addEventListener('click', async (e) => {
       if (currentRevisionId === id) { currentRevisionId = null; currentRevisionLabel = null; currentRevisionUpdatedAt = null; refreshRevisionBar(); }
       openRevisionsModal();
     } catch (err) {
-      alert('Erro ao excluir: ' + (err.code || err.message));
+      alert('Erro ao excluir: ' + msgErroBanco(err));
     }
   }
 });
@@ -571,7 +642,7 @@ async function loadRevision(id){
     refreshRevisionBar();
     render();
   } catch (err) {
-    alert('Erro ao carregar revisão: ' + (err.code || err.message));
+    alert('Erro ao carregar revisão: ' + msgErroBanco(err));
   }
 }
 
@@ -595,15 +666,16 @@ $('btn-confirm-new-revision').addEventListener('click', async () => {
   if (!label) { alert('Dê um nome para a revisão (ex: Setembro/2026).'); return; }
   const id = `rev-${Date.now()}`;
   const now = new Date().toISOString();
-  const payload = { label, createdAt: now, updatedAt: now, people: STATE.people, funcaoTipoMap: STATE.funcaoTipoMap };
+  const payload = { label, createdAt: now, updatedAt: now, createdBy: USER_EMAIL, updatedBy: USER_EMAIL, people: STATE.people, funcaoTipoMap: STATE.funcaoTipoMap };
   try {
-    if (AUTH_READY) await setDoc(doc(db, COLLECTION_NAME, id), payload);
+    exigirLogin();
+    await setDoc(doc(db, COLLECTION_NAME, id), payload);
     currentRevisionId = id; currentRevisionLabel = label; currentRevisionUpdatedAt = now;
     markSaved(); refreshRevisionBar();
     $('modal-new-revision').classList.remove('show');
     alert(`Revisão "${label}" salva com sucesso.`);
   } catch (err) {
-    alert('Erro ao salvar nova revisão: ' + (err.code || err.message));
+    alert('Erro ao salvar nova revisão: ' + msgErroBanco(err));
   }
 });
 
@@ -611,16 +683,15 @@ $('btn-update-revision').addEventListener('click', async () => {
   if (!currentRevisionId) return;
   const now = new Date().toISOString();
   try {
-    if (AUTH_READY) {
-      await setDoc(doc(db, COLLECTION_NAME, currentRevisionId), {
-        people: STATE.people, funcaoTipoMap: STATE.funcaoTipoMap, updatedAt: now
-      }, { merge: true });
-    }
+    exigirLogin();
+    await setDoc(doc(db, COLLECTION_NAME, currentRevisionId), {
+      people: STATE.people, funcaoTipoMap: STATE.funcaoTipoMap, updatedAt: now, updatedBy: USER_EMAIL
+    }, { merge: true });
     currentRevisionUpdatedAt = now;
     markSaved(); refreshRevisionBar();
     alert(`Revisão "${currentRevisionLabel}" atualizada.`);
   } catch (err) {
-    alert('Erro ao salvar atualização: ' + (err.code || err.message));
+    alert('Erro ao salvar atualização: ' + msgErroBanco(err));
   }
 });
 
