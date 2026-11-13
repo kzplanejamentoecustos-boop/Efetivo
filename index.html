@@ -175,7 +175,7 @@
 <main>
 
   <div class="status-banner show" id="sem-acesso-banner" style="display:none;">
-    🔒 Você não tem acesso ao Controle de Efetivo nesta obra. Peça ao gestor da obra para liberar em <a href="https://kzplanejamentoecustos-boop.github.io/PortalKZ/">Portal KZ</a> &gt; Equipe da obra.
+    🔒 Você não tem acesso ao Controle de Efetivo nesta obra. Fale com o gestor da obra.
   </div>
 
   <div class="status-banner" id="status-banner">
@@ -266,7 +266,7 @@
 
 </main>
 
-<footer>Controle de Efetivo · KZ Planejamento · v3.0 · Dados separados por obra no Firebase · <a href="https://kzplanejamentoecustos-boop.github.io/PortalKZ/">Portal KZ</a></footer>
+<footer>Controle de Efetivo · KZ Planejamento · v3.0 · Dados separados por obra</footer>
 
 <!-- ===== Modal: Adicionar/Editar Pessoa ===== -->
 <div class="modal-overlay" id="modal-person">
@@ -375,10 +375,11 @@
 <!-- Aberto sem obra: o Efetivo precisa saber de qual obra são os dados -->
 <div class="modal-overlay" id="modal-sem-obra">
   <div class="modal">
-    <h3>Escolha a obra no Portal KZ</h3>
-    <div class="modal-sub">O Controle de Efetivo agora guarda os dados separados por obra. Abra-o pelo Portal KZ, escolhendo a obra e clicando em "Abrir".</div>
+    <h3 id="sem-obra-titulo">Escolha a obra</h3>
+    <div class="modal-sub" id="sem-obra-texto">Você tem acesso ao Controle de Efetivo em mais de uma obra.</div>
+    <div id="lista-obras" style="display:flex; flex-direction:column; gap:8px;"></div>
     <div class="modal-actions">
-      <a class="btn btn-primary" href="https://kzplanejamentoecustos-boop.github.io/PortalKZ/">Ir para o Portal KZ</a>
+      <button class="btn btn-outline" id="btn-sair-sem-obra">Sair</button>
     </div>
   </div>
 </div>
@@ -423,19 +424,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-// ============ OBRA (Portal KZ) ============
-// Os dados ficam em obras/{obra}/efetivo. A obra vem do Portal KZ (?obra=wsf3);
-// sem ela, usa a última obra escolhida no Portal neste navegador.
-const PORTAL_URL = 'https://kzplanejamentoecustos-boop.github.io/PortalKZ/';
+// ============ OBRA ============
+// Os dados ficam em obras/{obra}/efetivo. A obra vem do link (?obra=wsf3); sem ela,
+// é descoberta pelas obras em que a pessoa tem acesso ao Efetivo (escolhe se houver mais de uma).
 const CONTROLE = 'efetivo';
-const OBRA = (() => {
-  let o = new URLSearchParams(location.search).get('obra');
-  if (!o) { try { o = localStorage.getItem('kz-portal-obra'); } catch { o = null; } }
-  return String(o || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
-})();
+let OBRA = String(new URLSearchParams(location.search).get('obra') || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
 const colecaoObra = () => collection(db, 'obras', OBRA, CONTROLE);
 const docObra = (id) => doc(db, 'obras', OBRA, CONTROLE, id);
-const COLLECTION_NAME = `Efetivo da obra ${OBRA.toUpperCase()}`;
+let COLLECTION_NAME = `Efetivo da obra ${OBRA.toUpperCase()}`;
 const NOME_PAPEL = { leitor: 'Leitor', editor: 'Editor', admin: 'Admin' };
 let PAPEL = '';          // '', 'leitor', 'editor', 'admin' (só para a tela; quem garante são as regras)
 
@@ -465,14 +461,53 @@ logoInput.addEventListener('change', (e) => {
 });
 
 // ============ AUTENTICAÇÃO ============
-// Login do Firebase (o mesmo do Portal KZ). Quem pode ler/editar é decidido pelas regras
-// do Firestore (equipe da obra no Portal), não por esta tela: sem permissão, o banco recusa.
+// Login do Firebase. Quem pode ler/editar é decidido pelas regras do Firestore
+// (equipe da obra), não por esta tela: sem permissão, o banco recusa.
 let USER_EMAIL = '';
 
 /** Lê o perfil da pessoa nesta obra (gestor geral, gestor da obra ou papel no Efetivo). */
+/** Obras em que a pessoa tem acesso ao Efetivo: [{ id, nome, sigla }]. */
+async function obrasComAcessoEfetivo(user){
+  const [gg, obras] = await Promise.all([getDoc(doc(db, 'gestores_gerais', user.uid)), getDocs(collection(db, 'obras'))]);
+  const lista = await Promise.all(obras.docs.map(async (o) => {
+    const d = o.data();
+    if (gg.exists()) return { id: o.id, nome: d.nome, sigla: d.sigla };
+    if (d.situacao === 'encerrada') return null;
+    const m = await getDoc(doc(db, 'obras', o.id, 'membros', user.uid));
+    if (!m.exists()) return null;
+    const md = m.data(), p = md.papeis || {};
+    const papel = md.gestor ? 'admin' : (p[CONTROLE] || p['*'] || '');
+    return NOME_PAPEL[papel] ? { id: o.id, nome: d.nome, sigla: d.sigla } : null;
+  }));
+  return lista.filter(Boolean).sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+}
+function definirObra(id){
+  OBRA = id;
+  COLLECTION_NAME = `Efetivo da obra ${OBRA.toUpperCase()}`;
+}
+
 async function carregarAcessoObra(user){
   PAPEL = '';
-  if (!OBRA) { $('modal-sem-obra').classList.add('show'); return; }
+  if (!OBRA) {
+    let obras = [];
+    try { obras = await obrasComAcessoEfetivo(user); }
+    catch (err) { $('obra-info').textContent = 'Não foi possível ler o acesso: ' + msgErroBanco(err); return; }
+    if (!obras.length) { $('obra-info').textContent = 'Sem acesso'; aplicarPermissoes(); return; }
+    if (obras.length > 1) {
+      const lista = $('lista-obras');
+      lista.innerHTML = '';
+      obras.forEach((o) => {
+        const b = document.createElement('button');
+        b.className = 'btn btn-outline';
+        b.textContent = `${o.sigla} — ${o.nome}`;
+        b.addEventListener('click', () => { $('modal-sem-obra').classList.remove('show'); definirObra(o.id); carregarAcessoObra(user); });
+        lista.appendChild(b);
+      });
+      $('modal-sem-obra').classList.add('show');
+      return;
+    }
+    definirObra(obras[0].id);
+  }
   try {
     const [gg, membro, obra] = await Promise.all([
       getDoc(doc(db, 'gestores_gerais', user.uid)),
@@ -544,6 +579,7 @@ $('btn-esqueci-senha').addEventListener('click', async () => {
   try { await sendPasswordResetEmail(auth, email); } catch (err) { /* não revela se o e-mail existe */ }
   mostrarErroLogin('Se o e-mail estiver cadastrado, você receberá um link para criar nova senha.');
 });
+$('btn-sair-sem-obra').addEventListener('click', async () => { $('modal-sem-obra').classList.remove('show'); await signOut(auth); });
 $('btn-logout').addEventListener('click', async (e) => {
   e.preventDefault();
   if (!$('rev-dot').classList.contains('unsaved') || confirm('Há alterações não salvas. Sair mesmo assim?')) await signOut(auth);
@@ -551,10 +587,10 @@ $('btn-logout').addEventListener('click', async (e) => {
 // Bloqueia gravação sem login (antes, o app dizia "salvo" mesmo sem gravar).
 function exigirLogin(){
   if (!AUTH_READY) { $('modal-login').classList.add('show'); throw { message: 'faça login para salvar.' }; }
-  if (!podeEditar()) throw { message: 'seu perfil nesta obra não permite salvar (peça ao gestor da obra no Portal KZ).' };
+  if (!podeEditar()) throw { message: 'seu perfil nesta obra não permite salvar (fale com o gestor da obra).' };
 }
 function msgErroBanco(err){
-  if (err && err.code === 'permission-denied') return 'seu usuário não tem permissão para esta ação nesta obra. Peça acesso ao gestor da obra no Portal KZ.';
+  if (err && err.code === 'permission-denied') return 'seu usuário não tem permissão para esta ação nesta obra. Fale com o gestor da obra.';
   return (err && (err.code || err.message)) || 'erro desconhecido';
 }
 
